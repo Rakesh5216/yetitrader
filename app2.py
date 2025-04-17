@@ -25,6 +25,7 @@ if 'pivot_initialized' not in st.session_state:
     st.session_state.s2 = 528.38
     st.session_state.s3 = 527.00
     st.session_state.price = 530.00
+    st.session_state.broken_levels = []
 
 # Two-tab system: Setup and Analysis
 tab1, tab2 = st.tabs(["Setup Pivot Levels", "Trade Analysis"])
@@ -54,9 +55,23 @@ with tab1:
     st.subheader("Central Pivot")
     pivot = st.number_input("Pivot", value=st.session_state.pivot, format="%.2f", step=0.01, key="pivot_input")
     
-    # Current price field (separate from session state)
-    st.subheader("Current Price")
-    price = st.number_input("Current SPY Price", value=st.session_state.price, format="%.2f", step=0.01, key="price_input")
+    # Broken levels section
+    st.subheader("Broken Levels (Optional)")
+    st.markdown("Select any levels that have been recently broken:")
+    
+    # Create broken levels checkboxes
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        broken_r3 = st.checkbox("R3 Broken", key="broken_r3")
+        broken_r2 = st.checkbox("R2 Broken", key="broken_r2")
+        broken_r1 = st.checkbox("R1 Broken", key="broken_r1")
+        broken_pivot = st.checkbox("Pivot Broken", key="broken_pivot")
+    
+    with col2:
+        broken_s1 = st.checkbox("S1 Broken", key="broken_s1")
+        broken_s2 = st.checkbox("S2 Broken", key="broken_s2")
+        broken_s3 = st.checkbox("S3 Broken", key="broken_s3")
     
     # Button to save pivot levels
     if st.button("Save Pivot Levels", type="primary"):
@@ -68,10 +83,20 @@ with tab1:
         st.session_state.s1 = s1
         st.session_state.s2 = s2
         st.session_state.s3 = s3
-        st.session_state.price = price
-        st.session_state.pivot_initialized = True
         
-        st.success("Pivot levels saved successfully! You can now switch to the Trade Analysis tab.")
+        # Store broken levels
+        broken_levels = []
+        if broken_r3: broken_levels.append(("R3", r3))
+        if broken_r2: broken_levels.append(("R2", r2))
+        if broken_r1: broken_levels.append(("R1", r1))
+        if broken_pivot: broken_levels.append(("Pivot", pivot))
+        if broken_s1: broken_levels.append(("S1", s1))
+        if broken_s2: broken_levels.append(("S2", s2))
+        if broken_s3: broken_levels.append(("S3", s3))
+        st.session_state.broken_levels = broken_levels
+        
+        st.session_state.pivot_initialized = True
+        st.success("Pivot levels and broken levels saved successfully! You can now switch to the Trade Analysis tab.")
     
     # Visualize pivot levels
     if st.checkbox("Show Pivot Levels Visualization", value=True):
@@ -81,20 +106,34 @@ with tab1:
         # Price range
         price_range = [s3, s2, s1, pivot, r1, r2, r3]
         labels = ["S3", "S2", "S1", "Pivot", "R1", "R2", "R3"]
-        colors = ["red", "red", "red", "purple", "green", "green", "green"]
         
-        # Create horizontal lines for each level
-        for i, (price_level, label, color) in enumerate(zip(price_range, labels, colors)):
-            ax.axhline(y=price_level, color=color, linestyle='-', alpha=0.7, linewidth=2)
-            ax.text(0.02, price_level, f"{label}: {price_level:.2f}", verticalalignment='center', fontweight='bold', color=color)
-        
-        # Highlight current price
-        ax.axhline(y=price, color='blue', linestyle='--', linewidth=2)
-        ax.text(0.02, price, f"Current: {price:.2f}", verticalalignment='center', fontweight='bold', color='blue')
+        # Create horizontal lines for each level with broken levels shown differently
+        for i, (price_level, label) in enumerate(zip(price_range, labels)):
+            # Check if this level is in broken_levels
+            is_broken = False
+            for blevel in st.session_state.broken_levels:
+                if blevel[0] == label:
+                    is_broken = True
+                    break
+            
+            if is_broken:
+                # Use dashed line for broken levels
+                ax.axhline(y=price_level, color='orange', linestyle='--', alpha=0.9, linewidth=2)
+                ax.text(0.02, price_level, f"{label}: {price_level:.2f} (BROKEN)", verticalalignment='center', fontweight='bold', color='orange')
+            else:
+                # Use normal colors
+                if label.startswith("R"):
+                    color = "green"
+                elif label.startswith("S"):
+                    color = "red"
+                else:
+                    color = "purple"
+                ax.axhline(y=price_level, color=color, linestyle='-', alpha=0.7, linewidth=2)
+                ax.text(0.02, price_level, f"{label}: {price_level:.2f}", verticalalignment='center', fontweight='bold', color=color)
         
         # Set the y-limits to be slightly outside the range of values
-        y_min = min(price_range + [price]) - 2
-        y_max = max(price_range + [price]) + 2
+        y_min = min(price_range) - 2
+        y_max = max(price_range) + 2
         ax.set_ylim(y_min, y_max)
         
         # Remove x-axis ticks and labels
@@ -110,22 +149,10 @@ with tab1:
 
 # Tab 2: Trade Analysis
 with tab2:
-    # Create sidebar for EMA inputs
-    st.sidebar.header("Input EMA Values")
+    # Create sidebar for inputs
+    st.sidebar.header("Input Values")
 
-    # SPY EMAs
-    spy_ema8 = st.sidebar.number_input("SPY 8 EMA", value=530.87, format="%.2f", step=0.01)
-    spy_ema21 = st.sidebar.number_input("SPY 21 EMA", value=531.40, format="%.2f", step=0.01)
-
-    # CALL EMAs
-    call_ema8 = st.sidebar.number_input("CALL 8 EMA", value=6.27, format="%.2f", step=0.01)
-    call_ema21 = st.sidebar.number_input("CALL 21 EMA", value=6.97, format="%.2f", step=0.01)
-
-    # PUT EMAs
-    put_ema8 = st.sidebar.number_input("PUT 8 EMA", value=1.78, format="%.2f", step=0.01)
-    put_ema21 = st.sidebar.number_input("PUT 21 EMA", value=1.59, format="%.2f", step=0.01)
-
-    # Current price input (for analysis tab)
+    # Current price (for analysis tab)
     current_price = st.sidebar.number_input(
         "Current Price",
         value=st.session_state.price,
@@ -133,6 +160,21 @@ with tab2:
         step=0.01,
         key="current_price_analysis"
     )
+    
+    # SPY EMAs
+    st.sidebar.header("SPY EMAs")
+    spy_ema8 = st.sidebar.number_input("SPY 8 EMA", value=530.87, format="%.2f", step=0.01)
+    spy_ema21 = st.sidebar.number_input("SPY 21 EMA", value=531.40, format="%.2f", step=0.01)
+
+    # CALL EMAs
+    st.sidebar.header("CALL EMAs")
+    call_ema8 = st.sidebar.number_input("CALL 8 EMA", value=6.27, format="%.2f", step=0.01)
+    call_ema21 = st.sidebar.number_input("CALL 21 EMA", value=6.97, format="%.2f", step=0.01)
+
+    # PUT EMAs
+    st.sidebar.header("PUT EMAs")
+    put_ema8 = st.sidebar.number_input("PUT 8 EMA", value=1.78, format="%.2f", step=0.01)
+    put_ema21 = st.sidebar.number_input("PUT 21 EMA", value=1.59, format="%.2f", step=0.01)
     
     # Function to determine nearest support and resistance
     def find_nearest_levels(price):
@@ -181,11 +223,40 @@ with tab2:
     st.sidebar.markdown(f"**Nearest Resistance:** ${nearest_levels['nearest_resistance']:.2f} ({nearest_levels['nearest_resistance_name']})")
     st.sidebar.markdown(f"**Nearest Support:** ${nearest_levels['nearest_support']:.2f} ({nearest_levels['nearest_support_name']})")
     
-    # Additional pivot context
-    pivot_context = st.sidebar.radio(
-        "Pivot Zone Context",
-        ["PUTs near resistance or CALLs near support", "Mid-range", "Near bounce zones or reversal levels", "Broken support/resistance"]
-    )
+    # Function to automatically determine pivot zone context
+    def determine_pivot_context(price, resistance, resistance_name, support, support_name, trend, broken_levels):
+        # Calculate threshold for "near" (using 0.3% of price as threshold)
+        near_threshold = price * 0.003
+        
+        # Check if any levels have been broken
+        if broken_levels:
+            return "Broken support/resistance", f"Recently broken: {', '.join([level[0] for level in broken_levels])}"
+        
+        # Check distance to nearest levels
+        distance_to_resistance = resistance - price
+        distance_to_support = price - support
+        
+        if trend == "UPTREND":
+            if distance_to_resistance < near_threshold:
+                return "Near bounce zones or reversal levels", f"Price near resistance ({resistance_name}: ${resistance:.2f})"
+            elif distance_to_support < near_threshold:
+                return "PUTs near resistance or CALLs near support", f"CALLs near support ({support_name}: ${support:.2f})"
+            else:
+                return "Mid-range", f"Price in middle zone between {support_name} and {resistance_name}"
+        
+        elif trend == "DOWNTREND":
+            if distance_to_support < near_threshold:
+                return "Near bounce zones or reversal levels", f"Price near support ({support_name}: ${support:.2f})"
+            elif distance_to_resistance < near_threshold:
+                return "PUTs near resistance or CALLs near support", f"PUTs near resistance ({resistance_name}: ${resistance:.2f})"
+            else:
+                return "Mid-range", f"Price in middle zone between {support_name} and {resistance_name}"
+        
+        else:  # NEUTRAL
+            if distance_to_resistance < near_threshold or distance_to_support < near_threshold:
+                return "Near bounce zones or reversal levels", f"Price near pivot level in neutral trend"
+            else:
+                return "Mid-range", f"Price in middle zone in neutral trend"
 
     # Calculate results button
     calculate_button = st.sidebar.button("Calculate Score & Recommendation", type="primary")
@@ -289,40 +360,45 @@ with tab2:
             return 0, "Neutral SPY trend - Option trend alignment not applicable"
 
     # Function to analyze pivot zone context
-    def analyze_pivot_zone(trend, price, resistance, support, context):
-        # Calculate distances
-        distance_to_resistance = resistance - price
-        distance_to_support = price - support
-        
+    def analyze_pivot_zone(trend, context, context_description):
         if trend == "UPTREND":
-            # For uptrend, we don't want to buy calls into resistance
             if context == "PUTs near resistance or CALLs near support":
-                return 15, "CALLs near support - favorable entry point ✓"
+                return 15, f"CALLs near support - favorable entry point ✓ ({context_description})"
             elif context == "Broken support/resistance":
-                return 15, "Broken resistance - favorable for continuation ✓"
+                return 15, f"Broken resistance - favorable for continuation ✓ ({context_description})"
             elif context == "Mid-range":
-                return 7.5, "Price in mid-range - moderately favorable ⚠️"
+                return 7.5, f"Price in mid-range - moderately favorable ⚠️ ({context_description})"
             else:  # Near bounce zones
-                return -5, "Price near potential reversal level - unfavorable ✗"
+                return -5, f"Price near potential reversal level - unfavorable ✗ ({context_description})"
         
         elif trend == "DOWNTREND":
-            # For downtrend, we don't want to buy puts into support
             if context == "PUTs near resistance or CALLs near support":
-                return 15, "PUTs near resistance - favorable entry point ✓"
+                return 15, f"PUTs near resistance - favorable entry point ✓ ({context_description})"
             elif context == "Broken support/resistance":
-                return 15, "Broken support - favorable for continuation ✓"
+                return 15, f"Broken support - favorable for continuation ✓ ({context_description})"
             elif context == "Mid-range":
-                return 7.5, "Price in mid-range - moderately favorable ⚠️"
+                return 7.5, f"Price in mid-range - moderately favorable ⚠️ ({context_description})"
             else:  # Near bounce zones
-                return -5, "Price near potential reversal level - unfavorable ✗"
+                return -5, f"Price near potential reversal level - unfavorable ✗ ({context_description})"
         
         else:  # NEUTRAL
-            return 0, "Neutral SPY trend - Pivot zone analysis not applicable"
+            return 0, f"Neutral SPY trend - Pivot zone analysis not applicable ({context_description})"
 
     # Main calculation function
     def calculate_score_and_recommendation():
-        # Calculate trend
+        # Calculate trend first (needed for context detection)
         trend, trend_score, trend_msg = determine_spy_trend(spy_ema8, spy_ema21)
+        
+        # Auto-detect pivot zone context
+        pivot_context, context_description = determine_pivot_context(
+            current_price,
+            nearest_levels['nearest_resistance'],
+            nearest_levels['nearest_resistance_name'],
+            nearest_levels['nearest_support'],
+            nearest_levels['nearest_support_name'],
+            trend,
+            st.session_state.broken_levels
+        )
         
         # Calculate scores for each pillar
         option_confirm_score, option_confirm_msg = analyze_option_confirmation(
@@ -340,7 +416,7 @@ with tab2:
         )
         
         pivot_score, pivot_msg = analyze_pivot_zone(
-            trend, current_price, nearest_levels['nearest_resistance'], nearest_levels['nearest_support'], pivot_context
+            trend, pivot_context, context_description
         )
         
         # Calculate total score
@@ -373,6 +449,8 @@ with tab2:
             "total_score": total_score,
             "recommendation": recommendation,
             "color": color,
+            "pivot_context": pivot_context,
+            "context_description": context_description,
             "details": [
                 {"category": "1. SPY EMA Trend", "score": trend_score, "message": trend_msg, "weight": "25%"},
                 {"category": "2. Option Chart Confirmation", "score": option_confirm_score, "message": option_confirm_msg, "weight": "25%"},
@@ -388,7 +466,7 @@ with tab2:
     # Show information before calculation
     if not calculate_button:
         # Show instructions when first loading the app
-        st.info("Enter your EMA values in the sidebar, then click 'Calculate Score & Recommendation' to analyze your trading setup.")
+        st.info("Enter your EMA values and current price in the sidebar, then click 'Calculate Score & Recommendation' to analyze your trading setup.")
         
         # Show framework explanation
         st.header("Yetitrader 4-Pillar Framework")
@@ -428,60 +506,102 @@ with tab2:
 
         # Display current pivot levels
         st.subheader("Current Pivot Levels")
+        
+        # Calculate trend for the visual (using the default values)
+        default_trend, _, _ = determine_spy_trend(spy_ema8, spy_ema21)
+        
+        # Auto-detect pivot zone context for visualization
+        default_context, default_context_desc = determine_pivot_context(
+            current_price,
+            nearest_levels['nearest_resistance'],
+            nearest_levels['nearest_resistance_name'],
+            nearest_levels['nearest_support'],
+            nearest_levels['nearest_support_name'],
+            default_trend,
+            st.session_state.broken_levels
+        )
+        
+        # Create a figure
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Price range
+        price_range = [
+            st.session_state.s3,
+            st.session_state.s2,
+            st.session_state.s1,
+            st.session_state.pivot,
+            st.session_state.r1,
+            st.session_state.r2,
+            st.session_state.r3
+        ]
+        labels = ["S3", "S2", "S1", "Pivot", "R1", "R2", "R3"]
+        
+        # Create horizontal lines for each level
+        for i, (price_level, label) in enumerate(zip(price_range, labels)):
+            # Check if this level is in broken_levels
+            is_broken = False
+            for blevel in st.session_state.broken_levels:
+                if blevel[0] == label:
+                    is_broken = True
+                    break
+            
+            if is_broken:
+                # Use dashed line for broken levels
+                ax.axhline(y=price_level, color='orange', linestyle='--', alpha=0.9, linewidth=2)
+                ax.text(0.02, price_level, f"{label}: {price_level:.2f} (BROKEN)", verticalalignment='center', fontweight='bold', color='orange')
+            else:
+                # Use normal colors
+                if label.startswith("R"):
+                    color = "green"
+                elif label.startswith("S"):
+                    color = "red"
+                else:
+                    color = "purple"
+                ax.axhline(y=price_level, color=color, linestyle='-', alpha=0.7, linewidth=2)
+                ax.text(0.02, price_level, f"{label}: {price_level:.2f}", verticalalignment='center', fontweight='bold', color=color)
+        
+        # Highlight current price
+        ax.axhline(y=current_price, color='blue', linestyle='--', linewidth=2)
+        ax.text(0.02, current_price, f"Current: {current_price:.2f}", verticalalignment='center', fontweight='bold', color='blue')
+        
+        # Add context information
+        ax.text(0.5, 0.02, f"Context: {default_context} - {default_context_desc}",
+                transform=ax.transAxes, horizontalalignment='center',
+                fontweight='bold', fontsize=10, color='blue',
+                bbox=dict(facecolor='white', alpha=0.8, edgecolor='blue', boxstyle='round,pad=0.5'))
+        
+        # Set the y-limits to be slightly outside the range of values
+        y_min = min(price_range + [current_price]) - 2
+        y_max = max(price_range + [current_price]) + 2
+        ax.set_ylim(y_min, y_max)
+        
+        # Remove x-axis ticks and labels
+        ax.set_xticks([])
+        ax.set_xticklabels([])
+        
+        # Set title and labels
+        ax.set_title("SPY Pivot Levels with Current Price")
+        ax.set_ylabel("Price")
+        
+        # Display the plot
+        st.pyplot(fig)
+        
+        # Display current pivot levels
         pivot_data = pd.DataFrame([
-            {"Level": "R3", "Value": st.session_state.r3},
-            {"Level": "R2", "Value": st.session_state.r2},
-            {"Level": "R1", "Value": st.session_state.r1},
-            {"Level": "Pivot", "Value": st.session_state.pivot},
-            {"Level": "Current Price", "Value": current_price},
-            {"Level": "S1", "Value": st.session_state.s1},
-            {"Level": "S2", "Value": st.session_state.s2},
-            {"Level": "S3", "Value": st.session_state.s3}
+            {"Level": "R3", "Value": st.session_state.r3, "Status": "Broken" if any(x[0] == "R3" for x in st.session_state.broken_levels) else "Active"},
+            {"Level": "R2", "Value": st.session_state.r2, "Status": "Broken" if any(x[0] == "R2" for x in st.session_state.broken_levels) else "Active"},
+            {"Level": "R1", "Value": st.session_state.r1, "Status": "Broken" if any(x[0] == "R1" for x in st.session_state.broken_levels) else "Active"},
+            {"Level": "Pivot", "Value": st.session_state.pivot, "Status": "Broken" if any(x[0] == "Pivot" for x in st.session_state.broken_levels) else "Active"},
+            {"Level": "Current Price", "Value": current_price, "Status": ""},
+            {"Level": "S1", "Value": st.session_state.s1, "Status": "Broken" if any(x[0] == "S1" for x in st.session_state.broken_levels) else "Active"},
+            {"Level": "S2", "Value": st.session_state.s2, "Status": "Broken" if any(x[0] == "S2" for x in st.session_state.broken_levels) else "Active"},
+            {"Level": "S3", "Value": st.session_state.s3, "Status": "Broken" if any(x[0] == "S3" for x in st.session_state.broken_levels) else "Active"}
         ])
         st.table(pivot_data)
         
-        # Visualize pivot levels
-        if st.checkbox("Show Pivot Levels Visualization", value=True):
-            # Create a figure
-            fig, ax = plt.subplots(figsize=(10, 6))
-            
-            # Price range
-            price_range = [
-                st.session_state.s3,
-                st.session_state.s2,
-                st.session_state.s1,
-                st.session_state.pivot,
-                st.session_state.r1,
-                st.session_state.r2,
-                st.session_state.r3
-            ]
-            labels = ["S3", "S2", "S1", "Pivot", "R1", "R2", "R3"]
-            colors = ["red", "red", "red", "purple", "green", "green", "green"]
-            
-            # Create horizontal lines for each level
-            for i, (price_level, label, color) in enumerate(zip(price_range, labels, colors)):
-                ax.axhline(y=price_level, color=color, linestyle='-', alpha=0.7, linewidth=2)
-                ax.text(0.02, price_level, f"{label}: {price_level:.2f}", verticalalignment='center', fontweight='bold', color=color)
-            
-            # Highlight current price
-            ax.axhline(y=current_price, color='blue', linestyle='--', linewidth=2)
-            ax.text(0.02, current_price, f"Current: {current_price:.2f}", verticalalignment='center', fontweight='bold', color='blue')
-            
-            # Set the y-limits to be slightly outside the range of values
-            y_min = min(price_range + [current_price]) - 2
-            y_max = max(price_range + [current_price]) + 2
-            ax.set_ylim(y_min, y_max)
-            
-            # Remove x-axis ticks and labels
-            ax.set_xticks([])
-            ax.set_xticklabels([])
-            
-            # Set title and labels
-            ax.set_title("SPY Pivot Levels")
-            ax.set_ylabel("Price")
-            
-            # Display the plot
-            st.pyplot(fig)
+        # Display detected context
+        st.subheader("Auto-Detected Context")
+        st.info(f"**{default_context}**: {default_context_desc}")
     else:
         # Calculate scores
         results = calculate_score_and_recommendation()
@@ -501,6 +621,10 @@ with tab2:
             
             # Display recommendation
             st.markdown(f"## Recommendation: <span style='color:{results['color']}'>{results['recommendation']}</span>", unsafe_allow_html=True)
+            
+            # Display auto-detected pivot context
+            st.subheader("Pivot Zone Context")
+            st.info(f"**{results['pivot_context']}**: {results['context_description']}")
             
             # Display detailed scores
             st.subheader("Detailed Analysis")
@@ -556,19 +680,70 @@ with tab2:
             ema_df = pd.DataFrame(ema_data)
             st.table(ema_df)
             
-            # Display pivot zone info
-            st.subheader("Pivot Zone Information")
-            pivot_data = pd.DataFrame([
-                {"Level": "R3", "Value": st.session_state.r3},
-                {"Level": "R2", "Value": st.session_state.r2},
-                {"Level": "R1", "Value": st.session_state.r1},
-                {"Level": "Pivot", "Value": st.session_state.pivot},
-                {"Level": "Current Price", "Value": current_price},
-                {"Level": "S1", "Value": st.session_state.s1},
-                {"Level": "S2", "Value": st.session_state.s2},
-                {"Level": "S3", "Value": st.session_state.s3}
-            ])
-            st.table(pivot_data)
+            # Create a figure for pivot visualization
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            # Price range
+            price_range = [
+                st.session_state.s3,
+                st.session_state.s2,
+                st.session_state.s1,
+                st.session_state.pivot,
+                st.session_state.r1,
+                st.session_state.r2,
+                st.session_state.r3
+            ]
+            labels = ["S3", "S2", "S1", "Pivot", "R1", "R2", "R3"]
+            
+            # Create horizontal lines for each level
+            for i, (price_level, label) in enumerate(zip(price_range, labels)):
+                # Check if this level is in broken_levels
+                is_broken = False
+                for blevel in st.session_state.broken_levels:
+                    if blevel[0] == label:
+                        is_broken = True
+                        break
+                
+                if is_broken:
+                    # Use dashed line for broken levels
+                    ax.axhline(y=price_level, color='orange', linestyle='--', alpha=0.9, linewidth=2)
+                    ax.text(0.02, price_level, f"{label}: {price_level:.2f} (BROKEN)", verticalalignment='center', fontweight='bold', color='orange')
+                else:
+                    # Use normal colors
+                    if label.startswith("R"):
+                        color = "green"
+                    elif label.startswith("S"):
+                        color = "red"
+                    else:
+                        color = "purple"
+                    ax.axhline(y=price_level, color=color, linestyle='-', alpha=0.7, linewidth=2)
+                    ax.text(0.02, price_level, f"{label}: {price_level:.2f}", verticalalignment='center', fontweight='bold', color=color)
+            
+            # Highlight current price
+            ax.axhline(y=current_price, color='blue', linestyle='--', linewidth=2)
+            ax.text(0.02, current_price, f"Current: {current_price:.2f}", verticalalignment='center', fontweight='bold', color='blue')
+            
+            # Add context information
+            ax.text(0.5, 0.02, f"Context: {results['pivot_context']}",
+                    transform=ax.transAxes, horizontalalignment='center',
+                    fontweight='bold', fontsize=10, color='blue',
+                    bbox=dict(facecolor='white', alpha=0.8, edgecolor='blue', boxstyle='round,pad=0.5'))
+            
+            # Set the y-limits to be slightly outside the range of values
+            y_min = min(price_range + [current_price]) - 2
+            y_max = max(price_range + [current_price]) + 2
+            ax.set_ylim(y_min, y_max)
+            
+            # Remove x-axis ticks and labels
+            ax.set_xticks([])
+            ax.set_xticklabels([])
+            
+            # Set title and labels
+            ax.set_title("SPY Pivot Levels with Current Price")
+            ax.set_ylabel("Price")
+            
+            # Display the plot
+            st.pyplot(fig)
 
 # Footer
 st.markdown("---")
